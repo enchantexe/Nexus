@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nexus</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ╔══════════════════════════════════════════════════════════╗
+     ║  AUTH SCREEN  (shown when logged out)                   ║
+     ╚══════════════════════════════════════════════════════════╝ -->
+<div id="auth-screen" class="screen active">
+  <div class="auth-bg">
+    <div class="orb orb1"></div><div class="orb orb2"></div><div class="orb orb3"></div>
+  </div>
+  <div class="auth-card">
+    <div class="auth-logo">N</div>
+    <h1 id="form-title">Welcome back</h1>
+    <p  id="form-sub"   class="auth-sub">Sign in to your account</p>
+
+    <div class="input-group">
+      <input type="text" id="inp-username" autocomplete="off" required>
+      <label>Username</label>
+      <span class="input-icon">◈</span>
+    </div>
+    <div class="input-group">
+      <input type="password" id="inp-password" required>
+      <label>Password</label>
+      <span class="input-icon" id="toggle-pw" onclick="togglePw()" style="cursor:pointer">👁</span>
+    </div>
+
+    <button class="btn-primary" onclick="submitForm()">
+      <span id="btn-text">Sign In</span><span class="btn-arrow">→</span>
+    </button>
+    <p class="switch-link">
+      <span id="switch-text">New here?</span>
+      <a onclick="toggleMode()"><span id="switch-action">Create account</span></a>
+    </p>
+    <p id="auth-msg" class="auth-msg"></p>
+  </div>
+</div>
+
+<!-- ╔══════════════════════════════════════════════════════════╗
+     ║  APP SHELL  (shown when logged in)                      ║
+     ╚══════════════════════════════════════════════════════════╝ -->
+<div id="app-shell" class="screen">
+
+  <!-- ── SIDEBAR ─────────────────────────────────────────── -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-top">
+      <div class="sidebar-logo">
+        <span class="logo-mark">N</span>
+        <span class="logo-text sidebar-label">Nexus</span>
+      </div>
+      <button class="collapse-btn" id="collapse-btn" onclick="toggleSidebar()" title="Collapse sidebar">
+        <span class="collapse-icon">‹</span>
+      </button>
+    </div>
+
+    <nav class="sidebar-nav">
+      <div class="nav-item active-nav" id="nav-dashboard"    onclick="openPage('page-dashboard')">
+        <span class="nav-icon">▦</span><span class="sidebar-label">Dashboard</span>
+      </div>
+      <div class="nav-item" id="nav-page-feed"       onclick="openPage('page-feed')">
+        <span class="nav-icon">◎</span><span class="sidebar-label">Feed</span>
+      </div>
+      <div class="nav-item" id="nav-page-friends"    onclick="openPage('page-friends')">
+        <span class="nav-icon">⬡</span><span class="sidebar-label">Friends</span>
+        <span class="nav-badge hidden" id="badge-friends">0</span>
+      </div>
+      <div class="nav-item" id="nav-page-chat"       onclick="openPage('page-chat')">
+        <span class="nav-icon">◍</span><span class="sidebar-label">Chat</span>
+        <span class="nav-badge hidden" id="badge-chat">0</span>
+      </div>
+      <div class="nav-item" id="nav-page-notes"      onclick="openPage('page-notes')">
+        <span class="nav-icon">◧</span><span class="sidebar-label">Notes</span>
+      </div>
+      <div class="nav-item" id="nav-page-profile"    onclick="openPage('page-profile')">
+        <span class="nav-icon">◉</span><span class="sidebar-label">Profile</span>
+      </div>
+      <div class="nav-item" id="nav-page-settings"   onclick="openPage('page-settings')">
+        <span class="nav-icon">◈</span><span class="sidebar-label">Settings</span>
+      </div>
+    </nav>
+
+    <div class="sidebar-footer">
+      <!-- Notification bell -->
+      <div class="notif-row" onclick="openPage('page-notifications')">
+        <span class="nav-icon">🔔</span>
+        <span class="sidebar-label">Notifications</span>
+        <span class="notif-dot hidden" id="notif-dot"></span>
+      </div>
+      <!-- User card + dropdown -->
+      <div class="sidebar-user-card" onclick="toggleDropdown()">
+        <img class="sidebar-avatar" id="sidebar-avatar" src="assets/default-avatar.svg" alt="avatar">
+        <div class="sidebar-user-info sidebar-label">
+          <span class="sidebar-username" id="sidebar-username">—</span>
+          <span class="sidebar-status" id="sidebar-status">● Online</span>
+        </div>
+        <span class="chevron sidebar-label" id="dropdown-chevron">⌃</span>
+      </div>
+      <div class="dropdown-menu hidden" id="dropdown-menu">
+        <div class="dropdown-item" onclick="openPage('page-profile')">◉ View Profile</div>
+        <div class="dropdown-item" onclick="openPage('page-settings')">◈ Settings</div>
+        <div class="dropdown-divider"></div>
+        <div class="dropdown-item danger" onclick="logout()">⏻ Sign Out</div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ── MAIN CONTENT ────────────────────────────────────── -->
+  <main class="main-content" id="main-content">
+
+    <!-- ════════════════════════════════════════
+         PAGE: DASHBOARD
+    ═════════════════════════════════════════ -->
+    <div id="page-dashboard" class="page-section active-section">
+      <div class="page-header">
+        <div><h1 class="page-title">Dashboard</h1><p class="page-sub">Here's what's happening.</p></div>
+        <div class="topbar-right">
+          <div class="notif-btn" onclick="openPage('page-notifications')">
+            🔔<span class="notif-badge hidden" id="topbar-notif-badge"></span>
+          </div>
+          <img class="topbar-avatar" id="topbar-avatar" src="assets/default-avatar.svg" onclick="openPage('page-profile')" alt="avatar">
+        </div>
+      </div>
+      <div class="cards-grid">
+        <div class="dash-card card-accent1">
+          <div class="card-label">Friends</div>
+          <div class="card-value" id="card-friends">0</div>
+          <div class="card-trend">⬡ Connected</div>
+        </div>
+        <div class="dash-card card-accent2">
+          <div class="card-label">Status</div>
+          <div class="card-value" id="card-status-val">Online</div>
+          <div class="card-trend">● Live</div>
+        </div>
+        <div class="dash-card card-accent3">
+          <div class="card-label">Notes</div>
+          <div class="card-value" id="card-notes">0</div>
+          <div class="card-trend">◧ Saved</div>
+        </div>
+        <div class="dash-card card-accent4">
+          <div class="card-label">Sessions</div>
+          <div class="card-value" id="card-sessions">1</div>
+          <div class="card-trend">↑ Total</div>
+        </div>
+      </div>
+      <h2 class="section-title">Activity Feed</h2>
+      <div class="activity-list" id="dash-activity-list"></div>
+    </div>
+
+    <!-- ════════════════════════════════════════
+         PAGE: FEED
+    ═════════════════════════════════════════ -->
+    <div id="page-feed" class="page-section hidden">
+      <div class="page-header">
+        <div><h1 class="page-title">Feed</h1><p class="page-sub">What your friends are up to.</p></div>
+      </div>
+      <!-- Compose -->
+      <div class="compose-box">
+        <img class="compose-avatar" id="feed-compose-avatar" src="assets/default-avatar.svg" alt="">
+        <div class="compose-right">
+          <textarea id="feed-input" class="compose-input" placeholder="What's on your mind?"></textarea>
+          <div class="compose-actions">
+            <select class="compose-mood" id="feed-mood">
+              <option value="">😶 Mood</option>
+              <option value="😄">😄 Happy</option>
+              <option value="😤">😤 Focused</option>
+              <option value="😴">😴 Tired</option>
+              <option value="🔥">🔥 Hyped</option>
+              <option value="😌">😌 Chill</option>
+            </select>
+            <button class="btn-post" onclick="postFeed()">Post</button>
+          </div>
+        </div>
+      </div>
+      <div id="feed-list" class="feed-list"></div>
+    </div>
+
+    <!-- ════════════════════════════════════════
+         PAGE: FRIENDS
+    ═════════════════════════════════════════ -->
+    <div id="page-friends" class="page-section hidden">
+      <div class="page-header">
+        <div><h1 class="page-title">Friends</h1><p class="page-sub">Manage your connections.</p></div>
+      </div>
+      <div class="friends-layout">
+        <div class="friends-col">
+          <h3 class="col-title">Find Users</h3>
+          <div class="search-row">
+            <input type="text" id="friend-search" class="search-input" placeholder="Search username…" oninput="searchUsers()">
+          </div>
+          <div id="user-search-results" class="user-list"></div>
+        </div>
+        <div class="friends-col">
+          <h3 class="col-title">Friend Requests <span class="badge-sm" id="req-count">0</span></h3>
+          <div id="friend-requests-list" class="user-list"></div>
+        </div>
+        <div class="friends-col">
+          <h3 class="col-title">My Friends <span class="badge-sm" id="friends-count">0</span></h3>
+          <div id="friends-list" class="user-list"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════════════
+         PAGE: CHAT
+    ═════════════════════════════════════════ -->
+    <div id="page-chat" class="page-section hidden">
+      <div class="page-header">
+        <div><h1 class="page-title">Chat</h1><p class="page-sub">Talk to your friends.</p></div>
+      </div>
+      <div class="chat-layout">
+        <div class="chat-sidebar">
+          <div class="chat-search-row">
+            <input type="text" class="search-input" placeholder="Search chats…" oninput="filterChats(this.value)">
+          </div>
+          <div id="chat-contact-list" class="chat-contact-list"></div>
+        </div>
+        <div class="chat-main" id="chat-main">
+          <div class="chat-empty" id="chat-empty">
+            <span class="chat-empty-icon">◍</span>
+            <p>Select a friend to start chatting</p>
+          </div>
+          <div class="chat-window hidden" id="chat-window">
+            <div class="chat-header" id="chat-header"></div>
+            <div class="chat-messages" id="chat-messages"></div>
+            <div class="chat-input-row">
+              <input type="text" id="chat-input" class="chat-input" placeholder="Type a message…"
+                     onkeydown="if(event.key==='Enter')sendMessage()">
+              <button class="btn-send" onclick="sendMessage()">↑</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════════════
+         PAGE: NOTES
+    ═════════════════════════════════════════ -->
+    <div id="page-notes" class="page-section hidden">
+      <div class="page-header">
+        <div><h1 class="page-title">Notes</h1><p class="page-sub">Your personal notepad.</p></div>
+        <button class="btn-primary sm" onclick="newNote()">+ New Note</button>
+      </div>
+      <div class="notes-layout">
+        <div class="notes-sidebar">
+          <div id="notes-list" class="notes-list"></div>
+        </div>
+        <div class="note-editor" id="note-editor">
+          <div class="note-editor-empty" id="note-editor-empty">
+            <span>◧</span><p>Select a note or create one</p>
+          </div>
+          <div class="note-editor-active hidden" id="note-editor-active">
+            <input type="text" id="note-title-input" class="note-title-input" placeholder="Note title…">
+            <textarea id="note-body-input" class="note-body-input" placeholder="Write something…"></textarea>
+            <div class="note-actions">
+              <button class="save-btn" onclick="saveNote()">Save</button>
+              <button class="danger-btn sm" onclick="deleteNote()">Delete</button>
+              <span class="note-saved-indicator" id="note-saved-indicator"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════════════
+         PAGE: PROFILE
+    ═════════════════════════════════════════ -->
+    <div id="page-profile" class="page-section hidden">
+      <div class="page-header">
+        <div><h1 class="page-title">Profile</h1><p class="page-sub">Your public identity.</p></div>
+      </div>
+
+      <!-- Cover banner -->
+      <div class="profile-cover" id="profile-cover">
+        <div class="cover-overlay">
+          <label class="cover-upload-btn">🖼 Change Banner
+            <input type="file" accept="image/*" onchange="uploadCover(event)" hidden>
+          </label>
+        </div>
+      </div>
+
+      <div class="profile-body">
+        <!-- Avatar -->
+        <div class="profile-avatar-wrap">
+          <div class="big-avatar" id="profile-avatar"
+               ondragover="avatarDragOver(event)"
+               ondragleave="avatarDragLeave(event)"
+               ondrop="avatarDrop(event)">
+            <img id="profile-avatar-img" src="assets/default-avatar.svg" alt="avatar">
+            <div class="avatar-overlay">
+              <label class="avatar-upload-label">
+                <span>↑</span><span>Drop or click</span>
+                <input type="file" accept="image/*" onchange="uploadAvatar(event)" hidden>
+              </label>
+            </div>
+          </div>
+          <!-- Status indicator -->
+          <div class="online-dot" id="profile-online-dot"></div>
+        </div>
+
+        <div class="profile-info-block">
+          <!-- Badges row -->
+          <div class="badges-row" id="badges-row"></div>
+
+          <!-- Username -->
+          <div class="editable-field">
+            <span class="field-label">Username</span>
+            <div class="field-row">
+              <span class="field-value" id="disp-username">—</span>
+              <button class="edit-btn" onclick="startEdit('username')">Edit</button>
+            </div>
+            <div class="field-edit hidden" id="edit-username">
+              <input type="text" id="inp-new-username" class="inline-input" placeholder="New username">
+              <button class="save-btn" onclick="saveUsername()">Save</button>
+              <button class="cancel-btn" onclick="cancelEdit('username')">✕</button>
+            </div>
+            <p class="field-msg" id="msg-username"></p>
+          </div>
+
+          <!-- Status message -->
+          <div class="editable-field">
+            <span class="field-label">Status Message</span>
+            <div class="field-row">
+              <span class="field-value" id="disp-status-msg">—</span>
+              <button class="edit-btn" onclick="startEdit('status-msg')">Edit</button>
+            </div>
+            <div class="field-edit hidden" id="edit-status-msg">
+              <input type="text" id="inp-status-msg" class="inline-input" placeholder="e.g. Building something cool…" maxlength="60">
+              <button class="save-btn" onclick="saveStatusMsg()">Save</button>
+              <button class="cancel-btn" onclick="cancelEdit('status-msg')">✕</button>
+            </div>
+          </div>
+
+          <!-- Bio -->
+          <div class="editable-field">
+            <span class="field-label">Bio</span>
+            <div class="field-row">
+              <span class="field-value bio-preview" id="disp-bio">—</span>
+              <button class="edit-btn" onclick="startEdit('bio')">Edit</button>
+            </div>
+            <div class="field-edit hidden" id="edit-bio">
+              <textarea id="inp-bio" class="inline-input" rows="3" placeholder="Tell people about yourself…" maxlength="200"></textarea>
+              <button class="save-btn" onclick="saveBio()">Save</button>
+              <button class="cancel-btn" onclick="cancelEdit('bio')">✕</button>
+            </div>
+          </div>
+
+          <!-- Social links -->
+          <div class="editable-field">
+            <span class="field-label">Social Links</span>
+            <div class="field-row">
+              <span class="field-value" id="disp-socials">—</span>
+              <button class="edit-btn" onclick="startEdit('socials')">Edit</button>
+            </div>
+            <div class="field-edit hidden" id="edit-socials">
+              <input type="text" id="inp-twitter"  class="inline-input" placeholder="Twitter handle (@…)">
+              <input type="text" id="inp-github"   class="inline-input" placeholder="GitHub username">
+              <input type="text" id="inp-website"  class="inline-input" placeholder="Website URL">
+              <button class="save-btn" onclick="saveSocials()">Save</button>
+              <button class="cancel-btn" onclick="cancelEdit('socials')">✕</button>
+            </div>
+            <div class="socials-display" id="socials-display"></div>
+          </div>
+
+          <!-- Password -->
+          <div class="editable-field">
+            <span class="field-label">Password</span>
+            <div class="field-row">
+              <span class="field-value">••••••••</span>
+              <button class="edit-btn" onclick="startEdit('password')">Change</button>
+            </div>
+            <div class="field-edit hidden" id="edit-password">
+              <input type="password" id="inp-cur-password" class="inline-input" placeholder="Current password">
+              <input type="password" id="inp-new-password" class="inline-input" placeholder="New password (6+)">
+              <button class="save-btn" onclick="savePassword()">Save</button>
+              <button class="cancel-btn" onclick="cancelEdit('password')">✕</button>
+            </div>
+            <p class="field-msg" id="msg-password"></p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════════════
+         PAGE: NOTIFICATIONS
+    ═════════════════════════════════════════ -->
+    <div id="page-notifications" class="page-section hidden">
+      <div class="page-header">
+        <div><h1 class="page-title">Notifications</h1><p class="page-sub">Your recent alerts.</p></div>
+        <button class="btn-outline" onclick="clearNotifications()">Clear all</button>
+      </div>
+      <div id="notifications-list" class="notifications-list"></div>
+    </div>
+
+    <!-- ════════════════════════════════════════
+         PAGE: SETTINGS
+    ═════════════════════════════════════════ -->
+    <div id="page-settings" class="page-section hidden">
+      <div class="page-header">
+        <div><h1 class="page-title">Settings</h1><p class="page-sub">Customize your experience.</p></div>
+      </div>
+      <div class="settings-grid">
+
+        <div class="settings-card">
+          <h3 class="settings-card-title">Appearance</h3>
+          <div class="settings-row">
+            <div><div class="settings-label">Theme</div><div class="settings-desc">Light or dark mode</div></div>
+            <div class="toggle-switch" id="theme-toggle" onclick="toggleTheme()"><div class="toggle-knob"></div></div>
+          </div>
+          <div class="settings-row">
+            <div><div class="settings-label">Reduce Motion</div><div class="settings-desc">Disable animations</div></div>
+            <div class="toggle-switch" id="motion-toggle" onclick="toggleMotion()"><div class="toggle-knob"></div></div>
+          </div>
+        </div>
+
+        <div class="settings-card">
+          <h3 class="settings-card-title">Profile Theme Badge</h3>
+          <p class="settings-desc" style="margin-bottom:12px">Pick a badge shown on your profile.</p>
+          <div class="badge-picker" id="badge-picker"></div>
+        </div>
+
+        <div class="settings-card">
+          <h3 class="settings-card-title">Online Status</h3>
+          <div class="settings-row">
+            <div><div class="settings-label">Show as Online</div><div class="settings-desc">Others can see you're active</div></div>
+            <div class="toggle-switch on" id="status-toggle" onclick="toggleOnlineStatus()"><div class="toggle-knob"></div></div>
+          </div>
+        </div>
+
+        <div class="settings-card">
+          <h3 class="settings-card-title">Account</h3>
+          <div class="settings-row">
+            <div><div class="settings-label">Signed in as</div><div class="settings-desc" id="settings-username">—</div></div>
+          </div>
+          <div class="settings-row">
+            <div><div class="settings-label">Delete Account</div><div class="settings-desc">Permanently remove all data</div></div>
+            <button class="danger-btn" onclick="deleteAccount()">Delete</button>
+          </div>
+        </div>
+
+        <div class="settings-card">
+          <h3 class="settings-card-title">Session</h3>
+          <div class="settings-row">
+            <div><div class="settings-label">Sign out</div><div class="settings-desc">End your current session</div></div>
+            <button class="danger-btn" onclick="logout()">Sign Out</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- Toast -->
+<div id="toast" class="toast hidden"></div>
+
+<!--
+  Load order:
+    1. script.js      — core: state, storage, navigation, toast, refreshUI, settings
+    2. pages/auth.js  — login, signup, logout
+    3. pages/dashboard.js — activity feed, stats
+    4. pages/profile.js   — avatar, cover, bio, socials, badges, username/password edit
+    5. pages/social.js    — friends, chat, feed, notifications, notes
+-->
+<script src="script.js"></script>
+<script src="pages/auth.js"></script>
+<script src="pages/dashboard.js"></script>
+<script src="pages/profile.js"></script>
+<script src="pages/social.js"></script>
+</body>
+</html>
