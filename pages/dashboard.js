@@ -1,44 +1,34 @@
 /* ================================================================
-   pages/dashboard.js — DASHBOARD
-   Activity log, stat cards.
-   Depends on: script.js
+   pages/dashboard.js — DASHBOARD  (Supabase edition)
 ================================================================ */
 
-// ── RENDER DASHBOARD ──────────────────────────────────────────
-function renderDashboard() {
+async function renderDashboard() {
   const user = currentUser();
   if (!user) return;
 
-  // Stat cards
-  const sessions = localStorage.getItem('sessions_' + user) || 1;
-  setText('card-sessions', sessions);
+  setText('card-sessions', getSessionCount(user));
 
-  const notes = JSON.parse(localStorage.getItem('notes_' + user) || '[]');
+  const notes = await dbGetNotes(user);
   setText('card-notes', notes.length);
 
-  const friends = JSON.parse(localStorage.getItem('friends_' + user) || '[]');
+  const friends = await dbGetFriends(user);
   setText('card-friends', friends.length);
 
-  const profile = getProfile(user);
+  const profile = await getProfile(user);
   setText('card-status-val', profile && profile.online !== false ? 'Online' : 'Offline');
 
-  renderActivity(user);
+  await renderActivity(user);
 }
 
-// ── ACTIVITY LOG ─────────────────────────────────────────────
-function addActivity(text) {
+async function addActivity(text) {
   const user = currentUser();
   if (!user) return;
-  const key = 'activity_' + user;
-  const log = JSON.parse(localStorage.getItem(key) || '[]');
-  log.unshift({ text, time: _now() });
-  if (log.length > 20) log.pop();
-  localStorage.setItem(key, JSON.stringify(log));
-  renderActivity(user);
+  await dbAddActivity(user, text);
+  await renderActivity(user);
 }
 
-function renderActivity(user) {
-  const log  = JSON.parse(localStorage.getItem('activity_' + user) || '[]');
+async function renderActivity(user) {
+  const log  = await dbGetActivity(user);
   const list = document.getElementById('dash-activity-list');
   if (!list) return;
 
@@ -47,7 +37,7 @@ function renderActivity(user) {
         '<div class="activity-item" style="animation-delay:' + (i * 0.04) + 's">' +
           '<div class="activity-dot"></div>' +
           '<span>' + e.text + '</span>' +
-          '<span class="activity-time">' + e.time + '</span>' +
+          '<span class="activity-time">' + _fmtTime(e.created_at) + '</span>' +
         '</div>'
       ).join('')
     : '<div class="activity-item"><div class="activity-dot"></div><span>No activity yet.</span></div>';
