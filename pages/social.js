@@ -1,25 +1,27 @@
 /* ================================================================
-   pages/social.js — SOCIAL FEATURES
-   Friends system, Chat, Activity Feed, Notifications, Notes.
-   Depends on: script.js, pages/dashboard.js
+   pages/social.js — SOCIAL FEATURES  (Supabase edition)
+   Friends, Chat, Feed, Notifications, Notes.
 ================================================================ */
 
 // ╔══════════════════════════════════════════════════════════════╗
 // ║  FRIENDS                                                     ║
 // ╚══════════════════════════════════════════════════════════════╝
 
-function renderFriendsPage() {
+async function renderFriendsPage() {
   const user    = currentUser();
-  const friends = JSON.parse(localStorage.getItem('friends_'  + user) || '[]');
-  const reqs    = JSON.parse(localStorage.getItem('requests_' + user) || '[]');
-  const users   = getUsers();
+  const friends = await dbGetFriends(user);
+  const reqs    = await dbGetFriendRequests(user);
 
-  // ── My friends list
+  // Build a quick profile map for display
+  const allUsers = await Promise.all([...friends, ...reqs].map(u => getProfile(u)));
+  const profileMap = {};
+  allUsers.forEach(p => { if (p) profileMap[p.username] = p; });
+
   const fList = document.getElementById('friends-list');
   setText('friends-count', friends.length);
   fList.innerHTML = friends.length
     ? friends.map(f => {
-        const p      = users[f] || {};
+        const p = profileMap[f] || {};
         const online = p.online !== false;
         return '<div class="user-row">' +
           '<img class="user-row-avatar" src="' + (p.avatar || 'assets/default-avatar.svg') + '">' +
@@ -33,13 +35,12 @@ function renderFriendsPage() {
       }).join('')
     : '<p class="empty-hint">No friends yet. Search for users above.</p>';
 
-  // ── Incoming requests
   const rList = document.getElementById('friend-requests-list');
   setText('req-count', reqs.length);
   rList.innerHTML = reqs.length
     ? reqs.map(r =>
         '<div class="user-row">' +
-          '<img class="user-row-avatar" src="' + ((users[r] || {}).avatar || 'assets/default-avatar.svg') + '">' +
+          '<img class="user-row-avatar" src="' + ((profileMap[r] || {}).avatar || 'assets/default-avatar.svg') + '">' +
           '<div class="user-row-info"><span class="user-row-name">' + r + '</span></div>' +
           '<button class="btn-sm" onclick="acceptRequest(\'' + r + '\')">Accept</button>' +
           '<button class="btn-sm danger-outline" onclick="declineRequest(\'' + r + '\')">Decline</button>' +
@@ -47,109 +48,74 @@ function renderFriendsPage() {
       ).join('')
     : '<p class="empty-hint">No pending requests.</p>';
 
-  // Reset search
   document.getElementById('user-search-results').innerHTML = '';
   document.getElementById('friend-search').value = '';
 }
 
-function searchUsers() {
+async function searchUsers() {
   const query   = document.getElementById('friend-search').value.trim().toLowerCase();
   const user    = currentUser();
-  const users   = getUsers();
-  const friends = JSON.parse(localStorage.getItem('friends_' + user) || '[]');
-  const sent    = JSON.parse(localStorage.getItem('sent_req_' + user) || '[]');
-  const reqs    = JSON.parse(localStorage.getItem('requests_' + user) || '[]');
   const results = document.getElementById('user-search-results');
-
   if (!query) { results.innerHTML = ''; return; }
 
-  const matches = Object.keys(users).filter(u =>
-    u !== user && u.toLowerCase().includes(query)
-  );
+  const { data } = await db.from('profiles').select('username, avatar, bio, online')
+    .ilike('username', '%' + query + '%').neq('username', user).limit(20);
 
-  results.innerHTML = matches.length
-    ? matches.map(u => {
-        const p       = users[u];
-        const isFriend = friends.includes(u);
-        const sentReq  = sent.includes(u);
-        const inReqs   = reqs.includes(u);
-        let btn;
-        if (isFriend)  btn = '<button class="btn-sm" disabled>Friends</button>';
-        else if (inReqs) btn = '<button class="btn-sm" onclick="acceptRequest(\'' + u + '\')">Accept</button>';
-        else if (sentReq) btn = '<button class="btn-sm" disabled>Requested</button>';
-        else           btn = '<button class="btn-sm" onclick="sendFriendRequest(\'' + u + '\')">+ Add</button>';
+  const friends = await dbGetFriends(user);
+  const reqs    = await dbGetFriendRequests(user);
+
+  results.innerHTML = (data && data.length)
+    ? data.map(u => {
+        const isFriend  = friends.includes(u.username);
+        const inReqs    = reqs.includes(u.username);
+        let sentBtn;
+        // Check sent async would be slow; optimistic UI — show Add unless already friend/request
+        if (isFriend)   sentBtn = '<button class="btn-sm" disabled>Friends</button>';
+        else if (inReqs) sentBtn = '<button class="btn-sm" onclick="acceptRequest(\'' + u.username + '\')">Accept</button>';
+        else            sentBtn = '<button class="btn-sm" onclick="sendFriendRequest(\'' + u.username + '\')">+ Add</button>';
         return '<div class="user-row">' +
-          '<img class="user-row-avatar" src="' + (p.avatar || 'assets/default-avatar.svg') + '">' +
-          '<div class="user-row-info"><span class="user-row-name">' + u + '</span>' +
-          '<span class="user-row-sub">' + (p.bio ? p.bio.slice(0,40) : 'No bio') + '</span></div>' +
-          btn + '</div>';
+          '<img class="user-row-avatar" src="' + (u.avatar || 'assets/default-avatar.svg') + '">' +
+          '<div class="user-row-info"><span class="user-row-name">' + u.username + '</span>' +
+          '<span class="user-row-sub">' + (u.bio ? u.bio.slice(0,40) : 'No bio') + '</span></div>' +
+          sentBtn + '</div>';
       }).join('')
     : '<p class="empty-hint">No users found.</p>';
 }
 
-function sendFriendRequest(to) {
+async function sendFriendRequest(to) {
   const user = currentUser();
-  // Add to target's requests
-  const reqs = JSON.parse(localStorage.getItem('requests_' + to) || '[]');
-  if (!reqs.includes(user)) { reqs.push(user); localStorage.setItem('requests_' + to, JSON.stringify(reqs)); }
-  // Track sent
-  const sent = JSON.parse(localStorage.getItem('sent_req_' + user) || '[]');
-  if (!sent.includes(to))   { sent.push(to);   localStorage.setItem('sent_req_' + user, JSON.stringify(sent)); }
-
-  pushNotif(to, user + ' sent you a friend request');
-  refreshNotifBadge(to);
-  searchUsers();
+  await dbSendFriendRequest(user, to);
+  await pushNotif(to, user + ' sent you a friend request');
+  await searchUsers();
   showToast('Friend request sent to ' + to, 'success');
-  addActivity('Sent friend request to ' + to);
+  await addActivity('Sent friend request to ' + to);
 }
 
-function acceptRequest(from) {
+async function acceptRequest(from) {
   const user = currentUser();
-  // Add to each other's friends
-  _addFriend(user, from);
-  _addFriend(from, user);
-  // Remove from requests
-  _removeRequest(user, from);
-  // Remove from sender's sent list
-  const sent = JSON.parse(localStorage.getItem('sent_req_' + from) || '[]');
-  localStorage.setItem('sent_req_' + from, JSON.stringify(sent.filter(x => x !== user)));
-
-  pushNotif(from, user + ' accepted your friend request');
-  renderFriendsPage();
-  renderDashboard();
+  await dbAddFriend(user, from);
+  await dbRemoveFriendRequest(from, user);
+  await pushNotif(from, user + ' accepted your friend request');
+  await renderFriendsPage();
+  await renderDashboard();
   showToast(from + ' is now your friend!', 'success');
-  addActivity('Became friends with ' + from);
+  await addActivity('Became friends with ' + from);
 }
 
-function declineRequest(from) {
-  _removeRequest(currentUser(), from);
-  renderFriendsPage();
+async function declineRequest(from) {
+  await dbRemoveFriendRequest(from, currentUser());
+  await renderFriendsPage();
   showToast('Request declined', '');
 }
 
-function removeFriend(target) {
+async function removeFriend(target) {
   if (!confirm('Remove ' + target + ' from friends?')) return;
   const user = currentUser();
-  _removeFriend(user, target);
-  _removeFriend(target, user);
-  renderFriendsPage();
-  renderDashboard();
+  await dbRemoveFriend(user, target);
+  await renderFriendsPage();
+  await renderDashboard();
   showToast(target + ' removed', '');
-  addActivity('Removed friend ' + target);
-}
-
-function _addFriend(a, b) {
-  const list = JSON.parse(localStorage.getItem('friends_' + a) || '[]');
-  if (!list.includes(b)) { list.push(b); localStorage.setItem('friends_' + a, JSON.stringify(list)); }
-}
-function _removeFriend(a, b) {
-  const list = JSON.parse(localStorage.getItem('friends_' + a) || '[]');
-  localStorage.setItem('friends_' + a, JSON.stringify(list.filter(x => x !== b)));
-}
-function _removeRequest(user, from) {
-  const reqs = JSON.parse(localStorage.getItem('requests_' + user) || '[]');
-  localStorage.setItem('requests_' + user, JSON.stringify(reqs.filter(x => x !== from)));
-  refreshNotifBadge(user);
+  await addActivity('Removed friend ' + target);
 }
 
 // ╔══════════════════════════════════════════════════════════════╗
@@ -158,99 +124,90 @@ function _removeRequest(user, from) {
 
 let _activeChatPartner = null;
 
-function renderChatContacts() {
+async function renderChatContacts() {
   const user    = currentUser();
-  const friends = JSON.parse(localStorage.getItem('friends_' + user) || '[]');
-  const users   = getUsers();
+  const friends = await dbGetFriends(user);
   const list    = document.getElementById('chat-contact-list');
 
-  list.innerHTML = friends.length
-    ? friends.map(f => {
-        const msgs    = JSON.parse(localStorage.getItem(_chatKey(user, f)) || '[]');
-        const last    = msgs[msgs.length - 1];
-        const profile = users[f] || {};
-        const online  = profile.online !== false;
-        return '<div class="contact-row ' + (f === _activeChatPartner ? 'active-contact' : '') + '" onclick="openChat(\'' + f + '\')">' +
-          '<div class="contact-avatar-wrap">' +
-            '<img class="contact-avatar" src="' + (profile.avatar || 'assets/default-avatar.svg') + '">' +
-            '<span class="contact-online-dot ' + (online ? 'online' : '') + '"></span>' +
-          '</div>' +
-          '<div class="contact-info">' +
-            '<span class="contact-name">' + f + '</span>' +
-            '<span class="contact-last">' + (last ? last.text.slice(0,28) + (last.text.length > 28 ? '…' : '') : 'No messages yet') + '</span>' +
-          '</div>' +
-        '</div>';
-      }).join('')
-    : '<p class="empty-hint" style="padding:16px">Add friends to start chatting.</p>';
+  if (!friends.length) {
+    list.innerHTML = '<p class="empty-hint" style="padding:16px">Add friends to start chatting.</p>';
+    return;
+  }
+
+  const profiles = await Promise.all(friends.map(f => getProfile(f)));
+  const profileMap = {};
+  profiles.forEach(p => { if (p) profileMap[p.username] = p; });
+
+  // Get last message for each friend
+  const rows = await Promise.all(friends.map(async f => {
+    const msgs = await dbGetMessages(user, f);
+    const last = msgs[msgs.length - 1];
+    const p    = profileMap[f] || {};
+    const online = p.online !== false;
+    return '<div class="contact-row ' + (f === _activeChatPartner ? 'active-contact' : '') + '" onclick="openChat(\'' + f + '\')">' +
+      '<div class="contact-avatar-wrap">' +
+        '<img class="contact-avatar" src="' + (p.avatar || 'assets/default-avatar.svg') + '">' +
+        '<span class="contact-online-dot ' + (online ? 'online' : '') + '"></span>' +
+      '</div>' +
+      '<div class="contact-info">' +
+        '<span class="contact-name">' + f + '</span>' +
+        '<span class="contact-last">' + (last ? last.text.slice(0,28) + (last.text.length > 28 ? '…' : '') : 'No messages yet') + '</span>' +
+      '</div>' +
+    '</div>';
+  }));
+  list.innerHTML = rows.join('');
 }
 
 function filterChats(q) {
-  const rows = document.querySelectorAll('.contact-row');
-  rows.forEach(r => {
+  document.querySelectorAll('.contact-row').forEach(r => {
     const name = r.querySelector('.contact-name').textContent.toLowerCase();
     r.style.display = name.includes(q.toLowerCase()) ? '' : 'none';
   });
 }
 
-function openChat(partner) {
+async function openChat(partner) {
   _activeChatPartner = partner;
-  const users = getUsers();
-  const p     = users[partner] || {};
+  const p = await getProfile(partner) || {};
 
   document.getElementById('chat-empty').classList.add('hidden');
   document.getElementById('chat-window').classList.remove('hidden');
 
   document.getElementById('chat-header').innerHTML =
-    '<img class="contact-avatar" src="' + (p.avatar || 'assets/default-avatar.svg') + '">' +
-    '<div><span class="contact-name">' + partner + '</span>' +
-    '<span class="contact-sub ' + (p.online !== false ? 'online' : '') + '">' +
-    (p.online !== false ? '● Online' : '○ Offline') + '</span></div>';
+    '<img style="width:34px;height:34px;border-radius:50%;object-fit:cover" src="' + (p.avatar || 'assets/default-avatar.svg') + '">' +
+    '<div>' +
+      '<div style="font-weight:600;font-size:14px">' + partner + '</div>' +
+      '<div style="font-size:12px;color:var(--text3)">' + (p.online !== false ? '● Online' : '○ Offline') + '</div>' +
+    '</div>';
 
-  renderMessages();
-  renderChatContacts();
-  document.getElementById('chat-input').focus();
-
-  // Also open chat page if not already there
-  openPage('page-chat');
+  await renderMessages();
+  await renderChatContacts();
 }
 
-function renderMessages() {
+async function renderMessages() {
+  if (!_activeChatPartner) return;
   const user = currentUser();
-  const msgs = JSON.parse(localStorage.getItem(_chatKey(user, _activeChatPartner)) || '[]');
+  const msgs = await dbGetMessages(user, _activeChatPartner);
   const box  = document.getElementById('chat-messages');
-
   box.innerHTML = msgs.map(m =>
-    '<div class="msg-bubble ' + (m.from === user ? 'mine' : 'theirs') + '">' +
-      '<span class="msg-text">' + _escHtml(m.text) + '</span>' +
-      '<span class="msg-time">' + m.time + '</span>' +
+    '<div class="msg-bubble ' + (m.sender === user ? 'mine' : 'theirs') + '">' +
+      _escHtml(m.text) +
+      '<span class="msg-time">' + _fmtTime(m.created_at) + '</span>' +
     '</div>'
   ).join('');
-
   box.scrollTop = box.scrollHeight;
 }
 
-function sendMessage() {
-  const input   = document.getElementById('chat-input');
-  const text    = input.value.trim();
+async function sendMessage() {
+  const input = document.getElementById('chat-input');
+  const text  = input.value.trim();
   if (!text || !_activeChatPartner) return;
-
-  const user    = currentUser();
-  const key     = _chatKey(user, _activeChatPartner);
-  const msgs    = JSON.parse(localStorage.getItem(key) || '[]');
-  msgs.push({ from: user, text, time: _now() });
-  localStorage.setItem(key, JSON.stringify(msgs));
-
-  // Mirror to the partner's perspective (same sorted key)
+  const user = currentUser();
+  await dbSendMessage(user, _activeChatPartner, text);
   input.value = '';
-  renderMessages();
-  renderChatContacts();
-  pushNotif(_activeChatPartner, user + ': ' + text.slice(0, 50));
-  addActivity('Sent a message to ' + _activeChatPartner);
-}
-
-/** Canonical chat key: always sorted alphabetically so both users share one thread */
-function _chatKey(a, b) {
-  return 'chat_' + [a, b].sort().join('_');
+  await renderMessages();
+  await renderChatContacts();
+  await pushNotif(_activeChatPartner, user + ': ' + text.slice(0, 50));
+  await addActivity('Sent a message to ' + _activeChatPartner);
 }
 
 function _escHtml(str) {
@@ -261,99 +218,79 @@ function _escHtml(str) {
 // ║  ACTIVITY FEED                                               ║
 // ╚══════════════════════════════════════════════════════════════╝
 
-function postFeed() {
+async function postFeed() {
   const input = document.getElementById('feed-input');
   const mood  = document.getElementById('feed-mood');
   const text  = input.value.trim();
   if (!text) return;
-
-  const user  = currentUser();
-  const key   = 'feed_' + user;
-  const posts = JSON.parse(localStorage.getItem(key) || '[]');
-  posts.unshift({ id: Date.now(), text, mood: mood.value, time: _now() });
-  if (posts.length > 50) posts.pop();
-  localStorage.setItem(key, JSON.stringify(posts));
-
-  input.value = '';
-  mood.value  = '';
-  renderFeed();
-  addActivity('Posted to feed');
+  const user = currentUser();
+  await dbPostFeed(user, text, mood.value);
+  input.value = ''; mood.value = '';
+  await renderFeed();
+  await addActivity('Posted to feed');
   showToast('Posted!', 'success');
 }
 
-function renderFeed() {
+async function renderFeed() {
   const user    = currentUser();
-  const users   = getUsers();
-  const friends = JSON.parse(localStorage.getItem('friends_' + user) || '[]');
+  const friends = await dbGetFriends(user);
   const sources = [user, ...friends];
   const list    = document.getElementById('feed-list');
 
-  // Gather all posts from self + friends, sort by id (newest first)
-  let all = [];
-  sources.forEach(u => {
-    const posts = JSON.parse(localStorage.getItem('feed_' + u) || '[]');
-    const p     = users[u] || {};
-    posts.forEach(post => all.push({ ...post, author: u, avatar: p.avatar || 'assets/default-avatar.svg' }));
-  });
-  all.sort((a, b) => b.id - a.id);
+  const posts = await dbGetFeed(sources);
 
-  list.innerHTML = all.length
-    ? all.map(post =>
-        '<div class="feed-post">' +
-          '<img class="feed-avatar" src="' + post.avatar + '" alt="">' +
+  list.innerHTML = posts.length
+    ? posts.map(post => {
+        const avatar = (post.profiles && post.profiles.avatar) || 'assets/default-avatar.svg';
+        return '<div class="feed-post">' +
+          '<img class="feed-avatar" src="' + avatar + '" alt="">' +
           '<div class="feed-body">' +
             '<div class="feed-meta">' +
-              '<span class="feed-author">' + post.author + '</span>' +
+              '<span class="feed-author">' + post.username + '</span>' +
               (post.mood ? '<span class="feed-mood">' + post.mood + '</span>' : '') +
-              '<span class="feed-time">' + post.time + '</span>' +
-              (post.author === user ? '<button class="feed-delete" onclick="deleteFeedPost(' + post.id + ')">✕</button>' : '') +
+              '<span class="feed-time">' + _fmtTime(post.created_at) + '</span>' +
+              (post.username === user ? '<button class="feed-delete" onclick="deleteFeedPost(\'' + post.id + '\')">✕</button>' : '') +
             '</div>' +
             '<p class="feed-text">' + _escHtml(post.text) + '</p>' +
           '</div>' +
-        '</div>'
-      ).join('')
+        '</div>';
+      }).join('')
     : '<div class="feed-empty">Nothing here yet. Post something or add friends!</div>';
 }
 
-function deleteFeedPost(id) {
-  const user  = currentUser();
-  const key   = 'feed_' + user;
-  const posts = JSON.parse(localStorage.getItem(key) || '[]').filter(p => p.id !== id);
-  localStorage.setItem(key, JSON.stringify(posts));
-  renderFeed();
+async function deleteFeedPost(id) {
+  await dbDeleteFeedPost(id);
+  await renderFeed();
 }
 
 // ╔══════════════════════════════════════════════════════════════╗
 // ║  NOTIFICATIONS                                               ║
 // ╚══════════════════════════════════════════════════════════════╝
 
-function renderNotifications() {
-  const user  = currentUser();
-  const key   = 'notifs_' + user;
-  const list  = JSON.parse(localStorage.getItem(key) || '[]');
-  const el    = document.getElementById('notifications-list');
+async function renderNotifications() {
+  const user = currentUser();
+  const list = await dbGetNotifs(user);
+  const el   = document.getElementById('notifications-list');
 
-  // Mark all as read
-  list.forEach(n => n.read = true);
-  localStorage.setItem(key, JSON.stringify(list));
-  refreshNotifBadge(user);
+  await dbMarkNotifsRead(user);
+  await refreshNotifBadge(user);
 
   el.innerHTML = list.length
     ? list.map(n =>
         '<div class="notif-item">' +
           '<div class="notif-dot"></div>' +
           '<span class="notif-text">' + n.text + '</span>' +
-          '<span class="notif-time">' + n.time + '</span>' +
+          '<span class="notif-time">' + _fmtTime(n.created_at) + '</span>' +
         '</div>'
       ).join('')
     : '<div class="notif-empty">No notifications yet.</div>';
 }
 
-function clearNotifications() {
+async function clearNotifications() {
   const user = currentUser();
-  localStorage.setItem('notifs_' + user, '[]');
-  refreshNotifBadge(user);
-  renderNotifications();
+  await dbClearNotifs(user);
+  await refreshNotifBadge(user);
+  await renderNotifications();
   showToast('Notifications cleared', '');
 }
 
@@ -363,19 +300,12 @@ function clearNotifications() {
 
 let _activeNoteId = null;
 
-function getNotes() {
-  return JSON.parse(localStorage.getItem('notes_' + currentUser()) || '[]');
-}
-function saveNotes(notes) {
-  localStorage.setItem('notes_' + currentUser(), JSON.stringify(notes));
-}
-
-function renderNotesList() {
-  const notes = getNotes();
+async function renderNotesList() {
+  const notes = await dbGetNotes(currentUser());
   const list  = document.getElementById('notes-list');
   list.innerHTML = notes.length
     ? notes.map(n =>
-        '<div class="note-row ' + (n.id === _activeNoteId ? 'active-note' : '') + '" onclick="openNote(' + n.id + ')">' +
+        '<div class="note-row ' + (n.id === _activeNoteId ? 'active-note' : '') + '" onclick="openNote(\'' + n.id + '\')">' +
           '<span class="note-row-title">' + (n.title || 'Untitled') + '</span>' +
           '<span class="note-row-preview">' + (n.body || '').slice(0, 40) + '</span>' +
         '</div>'
@@ -383,19 +313,19 @@ function renderNotesList() {
     : '<p class="empty-hint" style="padding:16px">No notes yet. Hit "+ New Note".</p>';
 }
 
-function newNote() {
-  const notes = getNotes();
-  const note  = { id: Date.now(), title: '', body: '', updatedAt: Date.now() };
-  notes.unshift(note);
-  saveNotes(notes);
-  openNote(note.id);
-  renderNotesList();
-  renderDashboard();
+async function newNote() {
+  const note = await dbCreateNote(currentUser());
+  if (!note) return;
+  _activeNoteId = note.id;
+  await openNote(note.id);
+  await renderNotesList();
+  await renderDashboard();
 }
 
-function openNote(id) {
+async function openNote(id) {
   _activeNoteId = id;
-  const note = getNotes().find(n => n.id === id);
+  const notes = await dbGetNotes(currentUser());
+  const note  = notes.find(n => n.id === id);
   if (!note) return;
 
   document.getElementById('note-editor-empty').classList.add('hidden');
@@ -403,38 +333,31 @@ function openNote(id) {
   document.getElementById('note-title-input').value = note.title;
   document.getElementById('note-body-input').value  = note.body;
   document.getElementById('note-saved-indicator').textContent = '';
-  renderNotesList();
+  await renderNotesList();
 }
 
-function saveNote() {
+async function saveNote() {
   if (!_activeNoteId) return;
   const title = document.getElementById('note-title-input').value.trim();
   const body  = document.getElementById('note-body-input').value;
-  const notes = getNotes().map(n =>
-    n.id === _activeNoteId ? { ...n, title, body, updatedAt: Date.now() } : n
-  );
-  saveNotes(notes);
-  renderNotesList();
-  renderDashboard();
+  await dbSaveNote(_activeNoteId, title, body);
+  await renderNotesList();
+  await renderDashboard();
   document.getElementById('note-saved-indicator').textContent = '✓ Saved';
-  setTimeout(() => {
-    const el = document.getElementById('note-saved-indicator');
-    if (el) el.textContent = '';
-  }, 2000);
+  setTimeout(() => { const el = document.getElementById('note-saved-indicator'); if (el) el.textContent = ''; }, 2000);
 }
 
-function deleteNote() {
+async function deleteNote() {
   if (!_activeNoteId || !confirm('Delete this note?')) return;
-  saveNotes(getNotes().filter(n => n.id !== _activeNoteId));
+  await dbDeleteNote(_activeNoteId);
   _activeNoteId = null;
   document.getElementById('note-editor-empty').classList.remove('hidden');
   document.getElementById('note-editor-active').classList.add('hidden');
-  renderNotesList();
-  renderDashboard();
+  await renderNotesList();
+  await renderDashboard();
   showToast('Note deleted', '');
 }
 
-// Auto-save on typing (debounced)
 let _noteSaveTimer = null;
 document.addEventListener('input', e => {
   if (e.target.id === 'note-title-input' || e.target.id === 'note-body-input') {
