@@ -113,6 +113,11 @@
     </div>
   </aside>
 
+  <!-- Floating expand button (visible only when sidebar is collapsed) -->
+  <button class="sidebar-expand-fab hidden" id="sidebar-expand-fab" onclick="toggleSidebar()" title="Expand sidebar">
+    <span>›</span>
+  </button>
+
   <!-- ── MAIN CONTENT ────────────────────────────────────── -->
   <main class="main-content" id="main-content">
 
@@ -471,6 +476,8 @@
     4. pages/profile.js   — avatar, cover, bio, socials, badges, username/password edit
     5. pages/social.js    — friends, chat, feed, notifications, notes
 -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="pages/supabase.js"></script>
 <script src="script.js"></script>
 <script src="pages/auth.js"></script>
 <script src="pages/dashboard.js"></script>
