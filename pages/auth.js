@@ -1,12 +1,9 @@
 /* ================================================================
-   pages/auth.js — AUTH
-   Login, signup, logout, toggle mode, password visibility.
-   Depends on: script.js
+   pages/auth.js — AUTH  (Supabase edition)
 ================================================================ */
 
 let loginMode = true;
 
-// ── TOGGLE MODE ───────────────────────────────────────────────
 function toggleMode() {
   loginMode = !loginMode;
   document.getElementById('form-title').textContent    = loginMode ? 'Welcome back'            : 'Create account';
@@ -18,20 +15,18 @@ function toggleMode() {
   document.getElementById('auth-msg').className   = 'auth-msg';
 }
 
-// ── PASSWORD VISIBILITY ───────────────────────────────────────
 function togglePw() {
   const pw = document.getElementById('inp-password');
   const ic = document.getElementById('toggle-pw');
-  pw.type     = pw.type === 'password' ? 'text' : 'password';
+  pw.type        = pw.type === 'password' ? 'text' : 'password';
   ic.textContent = pw.type === 'password' ? '👁' : '🔒';
 }
 
-// ── FORM SUBMIT ───────────────────────────────────────────────
-function submitForm() {
+async function submitForm() {
   const username = document.getElementById('inp-username').value.trim();
   const password = document.getElementById('inp-password').value.trim();
   const msg      = document.getElementById('auth-msg');
-  const users    = getUsers();
+  const btn      = document.getElementById('btn-text');
 
   const setMsg = (text, ok = false) => {
     msg.textContent = text;
@@ -41,46 +36,34 @@ function submitForm() {
   if (username.length < 4 || username.length > 20) return setMsg('Username must be 4–20 characters.');
   if (password.length < 6)                          return setMsg('Password must be at least 6 characters.');
 
+  btn.textContent = '…';
+
   if (loginMode) {
-    if (!users[username])                      return setMsg('User not found.');
-    if (users[username].password !== password) return setMsg('Wrong password.');
-    login(username);
+    const user = await checkLogin(username, password);
+    if (!user) { btn.textContent = 'Sign In'; return setMsg('Wrong username or password.'); }
+    await login(username);
   } else {
-    if (users[username]) return setMsg('Username already taken.');
-    users[username] = {
-      password,
-      avatar    : '',
-      banner    : '',
-      bio       : '',
-      statusMsg : '',
-      socials   : { twitter: '', github: '', website: '' },
-      badges    : [],
-      online    : true,
-      createdAt : Date.now()
-    };
-    saveUsers(users);
+    const exists = await userExists(username);
+    if (exists) { btn.textContent = 'Sign Up'; return setMsg('Username already taken.'); }
+    const ok = await createUser(username, password);
+    if (!ok) { btn.textContent = 'Sign Up'; return setMsg('Could not create account. Try again.'); }
     setMsg('Account created! Signing you in…', true);
     setTimeout(() => login(username), 700);
   }
 }
 
-// ── LOGIN ─────────────────────────────────────────────────────
-function login(username) {
+async function login(username) {
   localStorage.setItem('currentUser', username);
-
-  const key      = 'sessions_' + username;
-  const sessions = parseInt(localStorage.getItem(key) || '0') + 1;
-  localStorage.setItem(key, sessions);
+  bumpSession(username);
 
   document.getElementById('auth-screen').classList.remove('active');
   document.getElementById('app-shell').classList.add('active');
 
-  refreshUI(username);
-  openPage('page-dashboard');
-  addActivity('Signed in');
+  await refreshUI(username);
+  await openPage('page-dashboard');
+  await dbAddActivity(username, 'Signed in');
 }
 
-// ── LOGOUT ────────────────────────────────────────────────────
 function logout() {
   localStorage.removeItem('currentUser');
   location.reload();
