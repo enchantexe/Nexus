@@ -166,21 +166,42 @@ function filterChats(q) {
 }
 
 async function openChat(partner) {
+  const chatPage = document.getElementById('page-chat');
+  const isOnChatPage = chatPage && !chatPage.classList.contains('hidden');
+  if (!isOnChatPage) {
+    _activeChatPartner = partner;
+    await openPage('page-chat');
+  }
+
   _activeChatPartner = partner;
   const p = await getProfile(partner) || {};
 
   document.getElementById('chat-empty').classList.add('hidden');
   document.getElementById('chat-window').classList.remove('hidden');
 
+  // Mobile: hide contact list when chat is open
+  const chatSidebar = document.querySelector('.chat-sidebar');
+  if (chatSidebar) chatSidebar.classList.add('chat-open');
+
   document.getElementById('chat-header').innerHTML =
-    '<img style="width:34px;height:34px;border-radius:50%;object-fit:cover" src="' + (p.avatar || 'assets/default-avatar.svg') + '">' +
+    '<img style="width:34px;height:34px;border-radius:50%;object-fit:cover;flex-shrink:0" src="' + (p.avatar || 'assets/default-avatar.svg') + '">' +
     '<div>' +
       '<div style="font-weight:600;font-size:14px">' + partner + '</div>' +
       '<div style="font-size:12px;color:var(--text3)">' + (p.online !== false ? '● Online' : '○ Offline') + '</div>' +
-    '</div>';
+    '</div>' +
+    '<button class="chat-back-btn" onclick="closeChatWindow()" title="Back">‹</button>';
 
   await renderMessages();
   await renderChatContacts();
+}
+
+function closeChatWindow() {
+  _activeChatPartner = null;
+  document.getElementById('chat-empty').classList.remove('hidden');
+  document.getElementById('chat-window').classList.add('hidden');
+  // Mobile: show contact list again
+  const chatSidebar = document.querySelector('.chat-sidebar');
+  if (chatSidebar) chatSidebar.classList.remove('chat-open');
 }
 
 async function renderMessages() {
@@ -194,7 +215,8 @@ async function renderMessages() {
       '<span class="msg-time">' + _fmtTime(m.created_at) + '</span>' +
     '</div>'
   ).join('');
-  box.scrollTop = box.scrollHeight;
+  // Scroll after paint so height is calculated correctly
+  requestAnimationFrame(() => { box.scrollTop = box.scrollHeight; });
 }
 
 async function sendMessage() {
@@ -204,7 +226,7 @@ async function sendMessage() {
   const user = currentUser();
   await dbSendMessage(user, _activeChatPartner, text);
   input.value = '';
-  await renderMessages();
+  await renderMessages(); // already scrolls via rAF
   await renderChatContacts();
   await pushNotif(_activeChatPartner, user + ': ' + text.slice(0, 50));
   await addActivity('Sent a message to ' + _activeChatPartner);
