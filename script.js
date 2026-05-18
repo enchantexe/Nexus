@@ -11,9 +11,21 @@ async function openPage(pageId) {
   });
   const target = document.getElementById(pageId);
   if (target) { target.classList.remove('hidden'); target.offsetHeight; target.classList.add('active-section'); }
+
+  // Desktop nav
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active-nav'));
   const navBtn = document.getElementById('nav-' + pageId);
   if (navBtn) navBtn.classList.add('active-nav');
+
+  // Mobile bottom nav highlight
+  document.querySelectorAll('.mob-nav-item').forEach(n => n.classList.remove('active-mob-nav'));
+  const mobMap = {
+    'page-dashboard':'mob-nav-dashboard','page-feed':'mob-nav-feed',
+    'page-friends':'mob-nav-friends','page-chat':'mob-nav-chat','page-profile':'mob-nav-profile'
+  };
+  const mobBtn = document.getElementById(mobMap[pageId]);
+  if (mobBtn) mobBtn.classList.add('active-mob-nav');
+
   if (pageId === 'page-friends')       await renderFriendsPage();
   if (pageId === 'page-chat')          await renderChatContacts();
   if (pageId === 'page-notes')         await renderNotesList();
