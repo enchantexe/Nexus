@@ -113,11 +113,6 @@
     </div>
   </aside>
 
-  <!-- Floating expand button (visible only when sidebar is collapsed) -->
-  <button class="sidebar-expand-fab hidden" id="sidebar-expand-fab" onclick="toggleSidebar()" title="Expand sidebar">
-    <span>›</span>
-  </button>
-
   <!-- ── MAIN CONTENT ────────────────────────────────────── -->
   <main class="main-content" id="main-content">
 
@@ -465,17 +460,33 @@
   </main>
 </div>
 
+<!-- Mobile bottom nav (hidden on desktop via CSS) -->
+<nav class="mobile-bottom-nav" id="mobile-bottom-nav">
+  <div class="mob-nav-item" id="mob-nav-dashboard" onclick="openPage('page-dashboard')">
+    <span class="mob-nav-icon">▦</span><span class="mob-nav-label">Home</span>
+  </div>
+  <div class="mob-nav-item" id="mob-nav-feed" onclick="openPage('page-feed')">
+    <span class="mob-nav-icon">◎</span><span class="mob-nav-label">Feed</span>
+  </div>
+  <div class="mob-nav-item" id="mob-nav-friends" onclick="openPage('page-friends')">
+    <span class="mob-nav-icon">⬡</span><span class="mob-nav-label">Friends</span>
+  </div>
+  <div class="mob-nav-item" id="mob-nav-chat" onclick="openPage('page-chat')">
+    <span class="mob-nav-icon">◍</span><span class="mob-nav-label">Chat</span>
+  </div>
+  <div class="mob-nav-item" id="mob-nav-profile" onclick="openPage('page-profile')">
+    <span class="mob-nav-icon">◉</span><span class="mob-nav-label">Me</span>
+  </div>
+</nav>
+
+<!-- Floating sidebar expand FAB -->
+<button class="sidebar-expand-fab hidden" id="sidebar-expand-fab" onclick="toggleSidebar()" title="Expand sidebar">
+  <span>›</span>
+</button>
+
 <!-- Toast -->
 <div id="toast" class="toast hidden"></div>
 
-<!--
-  Load order:
-    1. script.js      — core: state, storage, navigation, toast, refreshUI, settings
-    2. pages/auth.js  — login, signup, logout
-    3. pages/dashboard.js — activity feed, stats
-    4. pages/profile.js   — avatar, cover, bio, socials, badges, username/password edit
-    5. pages/social.js    — friends, chat, feed, notifications, notes
--->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="pages/supabase.js"></script>
 <script src="script.js"></script>
